@@ -84,7 +84,7 @@ async function queryStaleRoutes(
       )
       // If there's less than 3 posts with a newer date, we need to revalidate everything
       if (moreStories < 3) {
-        return await queryAllRoutes(client)
+        return [...new Set([...(await queryAllRoutes(client)), ...staleRoutes])]
       }
     }
 
