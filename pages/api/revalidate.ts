@@ -65,10 +65,35 @@ export default async function revalidate(
 type StaleRoute = '/' | `/posts/${string}`
 
 async function queryStaleRoutes(
-  body: Pick<ParseBody['body'], '_type' | '_id'>
+  body: Pick<ParseBody['body'], '_type' | '_id' | 'date' | 'slug'>
 ): Promise<StaleRoute[]> {
   const client = createClient({ projectId, dataset, apiVersion, useCdn: false })
 
+  // Handle possible deletions
+  if (body._type === 'post') {
+    let staleRoutes: StaleRoute[] = ['/']
+    if ((body.slug as any)?.current) {
+      staleRoutes.push(`/posts/${(body.slug as any).current}`)
+    }
+    const exists = await client.fetch(groq`*[_id == $id][0]`, { id: body._id })
+    if (!exists) {
+      // Assume that the post document was deleted. Query the datetime used to sort "More stories" to determine if the post was in the list.
+      const moreStories = await client.fetch(
+        groq`count(
+          *[_type == "post"] | order(date desc, _updatedAt desc) [0...3] [dateTime(date) > dateTime($date)]
+        )`,
+        { date: body.date }
+      )
+      // If there's less than 3 posts with a newer date, we need to revalidate everything
+      if (moreStories < 3) {
+        console.log('More stories less than 3', {moreStories})
+        return await queryAllRoutes(client)
+      }
+    }
+    console.log('Deleting some stale routes')
+    return staleRoutes
+  }
+  
   switch (body._type) {
     case 'author':
       return await queryStaleAuthorRoutes(client, body._id)
