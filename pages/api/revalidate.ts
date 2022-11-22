@@ -36,21 +36,19 @@ export default async function revalidate(
       req,
       process.env.SANITY_REVALIDATE_SECRET
     )
-    console.log({body, isValidSignature})
     if (isValidSignature === false) {
       const message = 'Invalid signature'
       console.log(message)
       return res.status(401).send(message)
     }
 
-    const { _id, _type } = body
-    if (typeof _id !== 'string' || !_id) {
+    if (typeof body._id !== 'string' || !body._id) {
       const invalidId = 'Invalid _id'
       console.error(invalidId, { body })
       return res.status(400).send(invalidId)
     }
 
-    const staleRoutes = await queryStaleRoutes({ _id, _type })
+    const staleRoutes = await queryStaleRoutes(body as any)
     await Promise.all(staleRoutes.map((route) => res.revalidate(route)))
 
     const updatedRoutes = `Updated routes: ${staleRoutes.join(', ')}`
@@ -86,14 +84,13 @@ async function queryStaleRoutes(
       )
       // If there's less than 3 posts with a newer date, we need to revalidate everything
       if (moreStories < 3) {
-        console.log('More stories less than 3', {moreStories})
         return await queryAllRoutes(client)
       }
     }
-    console.log('Deleting some stale routes')
+
     return staleRoutes
   }
-  
+
   switch (body._type) {
     case 'author':
       return await queryStaleAuthorRoutes(client, body._id)
