@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const config = {
+  swcMinify: false,
   experimental: {
     appDir: true,
   },
